@@ -19,10 +19,14 @@ CFLAGS:= -std=gnu11 -MMD -fPIC -fvisibility=hidden $(ARCHFLAGS)
 ifeq ($(BUILD),debug)
   CFLAGS+= -Wall -Wextra -Werror -g
 else
-  CFLAGS+= -flto -O2
+  OPTFLAGS:= -O2
+  ifeq ($(findstring BSD,$(OS)),)
+    OPTFLAGS+= -flto
+  endif
+  CFLAGS+= $(OPTFLAGS)
 endif
 
-LDFLAGS:=
+LDFLAGS:= $(OPTFLAGS)
 ifneq ($(wildcard $(MAP)),)
   LDFLAGS+= -Wl,--version-script,$(MAP)
 endif
