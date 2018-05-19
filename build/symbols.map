@@ -1,0 +1,40 @@
+GLIBC_2.2.5 {
+	global:
+		accept;
+		close;
+		read;
+		readv;
+		recv;
+		recvfrom;
+		recvmsg;
+	local: *;
+};
+
+GLIBC_2.4 {
+	global:
+		__read_chk;
+		__recv_chk;
+		__recvfrom_chk;
+	local: *;
+};
+
+/*
+GLIBC_2.5 {
+	global:
+		splice;
+	local: *;
+};
+*/
+
+GLIBC_2.10 {
+	global:
+		accept4;
+	local: *;
+};
+
+GLIBC_2.12 {
+	global:
+		recvmmsg;
+	local: *;
+};
+
