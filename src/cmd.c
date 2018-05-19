@@ -24,6 +24,11 @@
 #define ARG(s) CARG s CRST
 #define VAR(s) CVAR s CRST
 
+static const struct opt *optset = NULL;
+static struct option optlong[256];
+static char optshort[countof(optlong)*2 + 2];
+static int optcount = 0, opthelp = -1, opthelpch = 0;
+
 static void
 conv(struct option *dst, const struct opt *src)
 {
@@ -32,6 +37,76 @@ conv(struct option *dst, const struct opt *src)
 		(IS_REQ(src) ? required_argument : optional_argument) : no_argument;
 	dst->flag = NULL;
 	dst->val = src->key;
+}
+
+static void
+opt_load(const struct opt *o)
+{
+	if (optset == o) { return; }
+
+	char *p = optshort;
+	*p++ = ':';
+
+	optset = o;
+	optcount = 0;
+	opthelp = -1;
+	opthelpch = 'h';
+
+	for (; o->name; optcount++, o++) {
+		if (optcount == (int)countof(optlong)) {
+			errx(1, "too many options");
+		}
+		conv(&optlong[optcount], o);
+		if (HAS_SHORT(o)) {
+			*p++ = o->key;
+			if (HAS_VAR(o)) { *p++ = ':'; }
+		}
+		if (strcmp(o->name, "help") == 0) {
+			opthelp = optcount;
+			opthelpch = o->key;
+		}
+		else if (o->key == 'h') {
+			opthelpch = 0;
+		}
+	}
+
+	if (opthelp < 0 && optcount < (int)countof(optlong)) {
+		optlong[optcount].name = "help";
+		optlong[optcount].has_arg = no_argument;
+		optlong[optcount].flag = NULL;
+		optlong[optcount].val = opthelpch;
+		*p++ = optlong[optcount].val;
+		opthelp = optcount++;
+	}
+
+	*p++ = '\0';
+	memset(&optlong[optcount], 0, sizeof(optlong[optcount]));
+}
+
+static size_t
+opt_len(const struct opt *o)
+{
+	size_t len = strlen(o->name);
+	if (HAS_VAR(o)) {
+		/* Account for the '=' character followed by the variable. */
+		len += strlen(o->var) + 1;
+		if (!IS_REQ(o)) {
+			/* Account for skipping the '?' and adding '[' and ']'. */
+			len++;
+		}
+	}
+	return len;
+}
+
+static size_t
+opt_max(const struct opt *o)
+{
+	size_t max = 0;
+	for (; o->name; o++) {
+		size_t len = opt_len(o);
+		if (len > max) { max = len; }
+	}
+	return max;
 }
 
 void
@@ -72,21 +147,6 @@ cmd_usage(const struct cmd *cmd)
 	fputc('\n', stderr);
 }
 
-static size_t
-opt_len(const struct opt *o)
-{
-	size_t len = strlen(o->name);
-	if (HAS_VAR(o)) {
-		/* Account for the '=' character followed by the variable. */
-		len += strlen(o->var) + 1;
-		if (!IS_REQ(o)) {
-			/* Account for skipping the '?' and adding '[' and ']'. */
-			len++;
-		}
-	}
-	return len;
-}
-
 void
 cmd_help(const struct cmd *cmd)
 {
@@ -100,12 +160,7 @@ cmd_help(const struct cmd *cmd)
 	if (cmd->opts->name) {
 		fprintf(stderr, "\n" HDR("options") "\n");
 
-		size_t max = 0;
-		for (const struct opt *o = cmd->opts; o->name; o++) {
-			size_t len = opt_len(o);
-			if (len > max) { max = len; }
-		}
-
+		size_t max = opt_max(cmd->opts);
 		for (const struct opt *o = cmd->opts; o->name; o++) {
 			if (HAS_SHORT(o)) { fprintf(stderr, "  " ARG("-%c") ",", o->key); }
 			else              { fprintf(stderr, "     "); }
@@ -128,58 +183,15 @@ cmd_help(const struct cmd *cmd)
 int
 cmd_getopt(int argc, char *const *argv, const struct cmd *cmd)
 {
-	static struct option copy[256];
-	static const struct opt *set = NULL;
-	static char optshort[countof(copy)*2 + 2];
-	static int count = 0, help = -1, helpch = 0;
-
-	const struct opt *o = cmd->opts;
-
-	if (set != o) {
-		char *p = optshort;
-		*p++ = ':';
-
-		set = o;
-		count = 0;
-		help = -1;
-		helpch = 'h';
-
-		for (; o->name; count++, o++) {
-			if (count == (int)countof(copy)) { errx(1, "too many options"); }
-			conv(&copy[count], o);
-			if (HAS_SHORT(o)) {
-				*p++ = o->key;
-				if (HAS_VAR(o)) { *p++ = ':'; }
-			}
-			if (strcmp(o->name, "help") == 0) {
-				help = count;
-				helpch = o->key;
-			}
-			else if (o->key == 'h') {
-				helpch = 0;
-			}
-		}
-
-		if (help < 0 && count < (int)countof(copy)) {
-			copy[count].name = "help";
-			copy[count].has_arg = no_argument;
-			copy[count].flag = NULL;
-			copy[count].val = helpch;
-			*p++ = copy[count].val;
-			help = count++;
-		}
-
-		*p++ = '\0';
-		memset(&copy[count], 0, sizeof(copy[count]));
-	}
+	opt_load(cmd->opts);
 
 	int idx = 0;
-	int ch = getopt_long(argc, argv, optshort, copy, &idx);
-	if (ch == helpch && (ch || idx == help)) {
+	int ch = getopt_long(argc, argv, optshort, optlong, &idx);
+	if (ch == opthelpch && (ch || idx == opthelp)) {
 		cmd_help(cmd);
 		exit(0);
 	}
-	optcur = &set[idx];
+	optcur = &optset[idx];
 	switch (ch) {
 	case '?': errx(1, "invalid option: %s", argv[optind-1]);
 	case ':': errx(1, "missing argument for option: %s", argv[optind-1]);

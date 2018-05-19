@@ -11,6 +11,8 @@
 #include <errno.h>
 #include <sys/resource.h>
 
+/* TODO: this is horribly thread-unsafe at the moment */
+
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
 #endif
