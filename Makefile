@@ -13,39 +13,47 @@ endif
 
 BIN:= build/bin/$(NAME)
 CFG:= build/tmp/config.h
-MAP:= build/symbols.map
+MAP:= build/$(OS).map
 
-ifeq ($(OS),Darwin)
-  LIBNAME:= $(NAME).dylib
-  SOFLAGS:= -dynamiclib -current_version 1.0 -compatibility_version 1.0
-else
-  SOFLAGS:= -shared -Wl,--version-script,$(MAP) -nostdlib -ldl -lpthread
-endif
-
-CFLAGS:= -std=gnu11 -MMD -D_GNU_SOURCE -fPIC -fvisibility=hidden $(ARCHFLAGS)
+CFLAGS:= -std=gnu11 -MMD -fPIC -fvisibility=hidden $(ARCHFLAGS)
 ifeq ($(BUILD),debug)
   CFLAGS+= -Wall -Wextra -Werror -g
 else
   CFLAGS+= -flto -O2
 endif
 
+LDFLAGS:=
+ifneq ($(wildcard $(MAP)),)
+  LDFLAGS+= -Wl,--version-script,$(MAP)
+endif
+
+ifeq ($(OS),Linux)
+  CFLAGS+= -D_GNU_SOURCE
+  LDFLAGS+= -ldl
+endif
+
+ifeq ($(OS),Darwin)
+  LIBNAME:= $(NAME).dylib
+  SOFLAGS:= -dynamiclib -current_version 1.0 -compatibility_version 1.0
+else
+  SOFLAGS:= -shared -nostdlib
+endif
+
 BINSRC:= main.c cmd.c proc.c sock.c debug.c
 LIBSRC:= trace.c hoist.c debug.c sock.c
 ifeq ($(LIBNAME),)
-  BINFLAGS:= -pie -Wl,-E -ldl -Wl,--version-script,$(MAP)
+  BINFLAGS:= -pie -Wl,-E $(LDFLAGS)
   BINSRC:= $(sort $(LIBSRC) $(BINSRC))
   LIBSRC:=
 else
   CFLAGS+= -DLIBNAME='"$(LIBNAME)"'
-  LIBFLAGS:= $(SOFLAGS)
+  BINFLAGS:= $(CFLAGS)
+  LIBFLAGS:= $(LDFLAGS) $(SOFLAGS)
   LIB:= build/lib/$(LIBNAME)
 endif
 BINOBJ:= $(BINSRC:%.c=build/tmp/%.o)
 LIBOBJ:= $(LIBSRC:%.c=build/tmp/%.o)
 DEP:= $(BINOBJ:%.o=%.d) $(LIBOBJ:%.o=%.d)
-
-BINFLAGS+= $(CFLAGS)
-LIBFLAGS+= $(CFLAGS)
 
 _all: $(BIN) $(LIB)
 
