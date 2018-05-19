@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <netinet/tcp.h>
+#include <arpa/inet.h>
 
 static bool
 parse_int(const char *net, int *out)
@@ -360,5 +361,46 @@ sock_perror(const struct sock *sock)
 	if (len > 0) {
 		retry(write(STDERR_FILENO, buf, len));
 	}
+}
+
+const char *
+addr_encode(const struct sockaddr *addr)
+{
+	_Thread_local static char buf[512];
+
+	const char *rc;
+	in_port_t port;
+
+	switch(addr->sa_family) {
+
+	default:
+		*buf = '\0';
+		return NULL;
+
+	case AF_UNIX:
+		return strncpy(buf, ((const struct sockaddr_un *)addr)->sun_path, sizeof(buf));
+
+	case AF_INET:
+		rc = inet_ntop(AF_INET, &((const struct sockaddr_in *)addr)->sin_addr,
+				buf, sizeof(buf));
+		port = ((const struct sockaddr_in *)addr)->sin_port;
+		break;
+
+	case AF_INET6:
+		rc = inet_ntop(AF_INET6, &((const struct sockaddr_in6 *)addr)->sin6_addr,
+				buf, sizeof(buf));
+		port = ((const struct sockaddr_in6 *)addr)->sin6_port;
+		break;
+    }
+
+	if (rc) {
+		ssize_t slen = strlen(buf), rem = (ssize_t)sizeof(buf) - slen, end;
+		end = snprintf(buf+slen, rem, ":%d", ntohs(port));
+		if (end < 0 || end > rem) {
+			rc = NULL;
+		}
+	}
+
+	return rc;
 }
 

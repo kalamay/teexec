@@ -91,6 +91,10 @@ bool
 sock_cloexec(int fd, bool on);
 
 
+const char *
+addr_encode(const struct sockaddr *addr);
+
+
 #define SOCKOPT(_type, _passive) ((struct sockopt) { \
 	.sndbuf = 0, \
 	.rcvbuf = 0, \

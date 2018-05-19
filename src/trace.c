@@ -165,10 +165,6 @@ trace_start(int clientfd, int serverfd)
 	int tracefd = fd_restore();
 	if (tracefd < 0) {
 		tracefd = xaccept(trace_fd, true);
-		DEBUG("accept: %d", tracefd);
-	}
-	else {
-		DEBUG("reclaim: %d", tracefd);
 	}
 	if (tracefd >= 0) {
 		DEBUG("pair: %d->%d", clientfd, tracefd);

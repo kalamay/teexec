@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <string.h>
+#include <ctype.h>
 #include <sys/uio.h>
 #include <errno.h>
 
@@ -41,13 +43,73 @@
 
 #endif
 
+static const char *
+str(const char *in, size_t len)
+{
+	_Thread_local static char buf[40];
+
+	char *p = buf, *pe = p + sizeof(buf) - sizeof("\"\"...");
+	*p++ = '"';
+
+	size_t i;
+	for (i = 0; i < len && p < pe; i++) {
+		char ch = in[i];
+		switch (ch) {
+		case '\0': memcpy(p, "\\0", 2); p += 2; break;
+		case '\a': memcpy(p, "\\a", 2); p += 2; break;
+		case '\b': memcpy(p, "\\b", 2); p += 2; break;
+		case '\f': memcpy(p, "\\f", 2); p += 2; break;
+		case '\n': memcpy(p, "\\n", 2); p += 2; break;
+		case '\r': memcpy(p, "\\r", 2); p += 2; break;
+		case '\t': memcpy(p, "\\t", 2); p += 2; break;
+		case '\v': memcpy(p, "\\v", 2); p += 2; break;
+		case '\\': memcpy(p, "\\\\", 2); p += 2; break;
+		case '\'': memcpy(p, "'", 2); p += 2; break;
+		case '\"': memcpy(p, "\"", 2); p += 2; break;
+		default:
+			if (isprint(ch)) {
+				*p++ = ch;
+			}
+			else {
+				int n = snprintf(p, pe - p, "\\x%02x", ch);
+				if (n < 0 || n > pe - p) {
+					break;
+				}
+				p += n;
+			}
+		}
+	}
+	*p++ = '"';
+
+	if (i < len) {
+		memcpy(p, "...", 3);
+		p += 3;
+	}
+	*p = '\0';
+	return buf;
+}
+
+static const char *
+rcmsg(ssize_t rc)
+{
+	_Thread_local static char buf[64];
+	int n1 = snprintf(buf, sizeof(buf), "%zd", rc);
+	if (rc < 0) {
+		int n2 = snprintf(buf+n1, sizeof(buf)-n1, ", %s", strerror(errno));
+		if (n2 < 0 || n2 >= (int)sizeof(buf)-n1) {
+			buf[n1] = '\0';
+		}
+	}
+	return buf;
+}
+
 hoist(close, int,
 		int fd)
 {
 	trace_stop(fd);
 	int rc = libc(close)(fd);
-	DEBUG("close(%d) = %d",
-			fd, rc);
+	DEBUG("close(%d) = %s",
+			fd, rcmsg(rc));
 	return rc;
 }
 
@@ -55,9 +117,9 @@ hoist(accept, int,
 		int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	int n = libc(accept)(sockfd, addr, addrlen);
+	DEBUG("accept(%d, \"%s\") = %s",
+			sockfd, addr_encode(addr), rcmsg(n));
 	if (n > -1) {
-		DEBUG("accept(%d, %p, %p) = %d",
-				sockfd, addr, addrlen, n);
 		trace_start(n, sockfd);
 	}
 	return n;
@@ -68,9 +130,9 @@ hoist(accept4, int,
 		int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 {
 	int n = libc(accept4)(sockfd, addr, addrlen, flags);
+	DEBUG("accept4(%d, \"%s\", %d) = %s",
+			sockfd, addr_encode(addr), flags, rcmsg(n));
 	if (n > -1) {
-		DEBUG("accept4(%d, %p, %p, %d) = %d",
-				sockfd, addr, addrlen, flags, n);
 		trace_start(n, sockfd);
 	}
 	return n;
@@ -81,9 +143,9 @@ hoist(read, ssize_t,
 		int fd, void *buf, size_t count)
 {
 	ssize_t n = libc(read)(fd, buf, count);
+	DEBUG("read(%d, %s, %zu) = %s",
+			fd, str(buf, (size_t)n), count, rcmsg(n));
 	if (n > 0) {
-		DEBUG("read(%d, %p, %zu) = %zd",
-				fd, buf, count, n);
 		trace(fd, buf, n);
 	}
 	return n;
@@ -94,9 +156,9 @@ hoist(__read_chk, ssize_t,
 		int fd, void *buf, size_t nbytes, size_t buflen)
 {
 	ssize_t n = libc(__read_chk)(fd, buf, nbytes, buflen);
+	DEBUG("__read_chk(%d, %s, %zu, %zu) = %s",
+			fd, str(buf, (size_t)n), nbytes, buflen, rcmsg(n));
 	if (n > 0) {
-		DEBUG("read(%d, %p, %zu) = %zd",
-				fd, buf, nbytes, n);
 		trace(fd, buf, n);
 	}
 	return n;
@@ -107,9 +169,9 @@ hoist(readv, ssize_t,
 		int fd, const struct iovec *iov, int iovcnt)
 {
 	ssize_t n = libc(readv)(fd, iov, iovcnt);
+	DEBUG("readv(%d, %p, %d) = %s",
+			fd, iov, iovcnt, rcmsg(n));
 	if (n > 0) {
-		DEBUG("readv(%d, %p, %d) = %zd",
-				fd, iov, iovcnt, n);
 		tracev(fd, iov, iovcnt);
 	}
 	return n;
@@ -120,9 +182,9 @@ hoist(recvfrom, ssize_t,
 		struct sockaddr *src_addr, socklen_t *addrlen)
 {
 	ssize_t n = libc(recvfrom)(sockfd, buf, len, flags, src_addr, addrlen);
+	DEBUG("recvfrom(%d, %s, %zu, %d, %p, %p) = %s",
+			sockfd, str(buf, (size_t)n), len, flags, src_addr, addrlen, rcmsg(n));
 	if (n > 0) {
-		DEBUG("recvfrom(%d, %p, %zu, %d, %p, %p) = %zd",
-				sockfd, buf, len, flags, src_addr, addrlen, n);
 		trace(sockfd, buf, n);
 	}
 	return n;
@@ -132,9 +194,9 @@ hoist(recv, ssize_t,
 		int sockfd, void *buf, size_t len, int flags)
 {
 	ssize_t n = libc(recvfrom)(sockfd, buf, len, flags, NULL, NULL);
+	DEBUG("recv(%d, %s, %zu, %d) = %s",
+			sockfd, str(buf, (size_t)n), len, flags, rcmsg(n));
 	if (n > 0) {
-		DEBUG("recv(%d, %p, %zu, %d) = %zd",
-				sockfd, buf, len, flags, n);
 		trace(sockfd, buf, n);
 	}
 	return n;
@@ -145,9 +207,9 @@ hoist(__recv_chk, ssize_t,
 		int sockfd, void *buf, size_t len, size_t buflen, int flags)
 {
 	ssize_t n = libc(__recv_chk)(sockfd, buf, len, buflen, flags);
+	DEBUG("__recv_chk(%d, %s, %zu, %zu, %d) = %s",
+			sockfd, str(buf, (size_t)n), len, buflen, flags, rcmsg(n));
 	if (n > 0) {
-		DEBUG("recv(%d, %p, %zu, %d) = %zd",
-				sockfd, buf, len, flags, n);
 		trace(sockfd, buf, n);
 	}
 	return n;
@@ -160,9 +222,9 @@ hoist(__recvfrom_chk, ssize_t,
 		struct sockaddr *src_addr, socklen_t *addrlen)
 {
 	ssize_t n = libc(__recvfrom_chk)(sockfd, buf, len, buflen, flags, src_addr, addrlen);
+	DEBUG("__recvfrom_chk(%d, %s, %zu, %zu, %d, %p, %p) = %s",
+			sockfd, str(buf, (size_t)n), len, buflen, flags, src_addr, addrlen, rcmsg(n));
 	if (n > 0) {
-		DEBUG("recvfrom(%d, %p, %zu, %d, %p, %p) = %zd",
-				sockfd, buf, len, flags, src_addr, addrlen, n);
 		trace(sockfd, buf, n);
 	}
 	return n;
@@ -173,9 +235,9 @@ hoist(recvmsg, ssize_t,
 		int sockfd, struct msghdr *msg, int flags)
 {
 	ssize_t n = libc(recvmsg)(sockfd, msg, flags);
+	DEBUG("recvmsg(%d, %p, %d) = %s",
+			sockfd, msg, flags, rcmsg(n));
 	if (n > 0) {
-		DEBUG("recvmsg(%d, %p, %d) = %zd",
-				sockfd, msg, flags, n);
 		tracev(sockfd, msg->msg_iov, msg->msg_iovlen);
 	}
 	return n;
@@ -187,10 +249,9 @@ hoist(recvmmsg, int,
 		int flags, struct timespec *timeout)
 {
 	int n = libc(recvmmsg)(sockfd, msgvec, vlen, flags, timeout);
+	DEBUG("recvmmsg(%d, %p, %u, %d, %p) = %s",
+			sockfd, msgvec, vlen, flags, timeout, rcmsg(n));
 	if (n > 0) {
-		DEBUG("recvmmsg(%d, %p, %u, %d, %p) = %d",
-				sockfd, msgvec, vlen, flags, timeout, n);
-
 		size_t iovcnt = 0;
 		for (unsigned int i = 0; i < vlen; i++) {
 			iovcnt += msgvec[i].msg_hdr.msg_iovlen;
