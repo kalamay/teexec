@@ -79,8 +79,6 @@ build/bin build/lib build/tmp:
 clean:
 	rm -rf build/tmp build/bin build/lib
 
-build/tmp/hoist.o: $(MAP)
-
 .PHONY: all _all run clean
 
 -include $(DEP)
