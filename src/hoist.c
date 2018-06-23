@@ -292,8 +292,8 @@ int xaccept(int s, bool nonblock)
 	struct sockaddr_storage ss;
 	socklen_t slen = sizeof(ss);
 #if HAS_ACCEPT4
-	int fd = libc(accept4)(s, (struct sockaddr *)&ss, &slen,
-			SOCK_CLOEXEC | (nonblock ? SOCK_NONBLOCK : 0));
+	int fd = retry(libc(accept4)(s, (struct sockaddr *)&ss, &slen,
+			SOCK_CLOEXEC | (nonblock ? SOCK_NONBLOCK : 0)));
 #else
 	int fd = retry(libc(accept)(s, (struct sockaddr *)&ss, &slen));
 	if (fd >= 0) {
