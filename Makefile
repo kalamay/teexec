@@ -3,6 +3,9 @@ all: _all
 -include build/Custom.mk
 
 NAME?= teexec
+PREFIX?= /usr/local
+BINDIR:= $(DESTDIR)$(PREFIX)/bin
+LIBDIR:= $(DESTDIR)$(PREFIX)/lib
 OS:= $(shell uname -s)
 ARCH?= $(shell uname -m)
 ifeq ($(ARCH_TARGET),x86_32)
@@ -54,10 +57,13 @@ else
   BINFLAGS:= $(CFLAGS)
   LIBFLAGS:= $(LDFLAGS) $(SOFLAGS)
   LIB:= build/lib/$(LIBNAME)
+  DESTLIB:= $(LIBDIR)/$(LIBNAME)
 endif
+DESTBIN:= $(BINDIR)/$(NAME)
 BINOBJ:= $(BINSRC:%.c=build/tmp/%.o)
 LIBOBJ:= $(LIBSRC:%.c=build/tmp/%.o)
 DEP:= $(BINOBJ:%.o=%.d) $(LIBOBJ:%.o=%.d)
+
 
 _all: $(BIN) $(LIB)
 
@@ -76,9 +82,22 @@ build/tmp/%.o: src/%.c $(CFG) | build/tmp
 build/bin build/lib build/tmp:
 	mkdir $@
 
+install: $(DESTBIN) $(DESTLIB)
+
+$(DESTBIN): $(BIN)
+	install -d $(BINDIR)/
+	install -m 755 $< $(BINDIR)/
+
+$(DESTLIB): $(LIB)
+	install -d $(LIBDIR)/
+	install -m 755 $< $(LIBDIR)/
+
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/lib/$(LIBNAME) $(DESTDIR)$(PREFIX)/bin/$(NAME)
+
 clean:
 	rm -rf build/tmp build/bin build/lib
 
-.PHONY: all _all run clean
+.PHONY: all _all install uninstall clean
 
 -include $(DEP)
