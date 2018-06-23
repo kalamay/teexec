@@ -3,6 +3,15 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <stdatomic.h>
+
+#include "util.h"
+
+#define TRACE_DEBUG 1
+#define TRACE_MULTIPLEX 2
+
+void
+trace_init(int fd, int mode);
 
 void
 trace_start(int clientfd, int serverfd);

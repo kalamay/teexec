@@ -10,9 +10,6 @@
 #include "bypass.h"
 #include "trace.h"
 
-#define export __attribute__((visibility("default")))
-#define constructor(name) __attribute__((constructor)) static void name(void)
-
 #if __APPLE__
 
 #define hoist(name, ret, ...) \

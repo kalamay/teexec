@@ -44,7 +44,7 @@ else
 endif
 
 BINSRC:= main.c cmd.c proc.c sock.c debug.c
-LIBSRC:= trace.c hoist.c debug.c sock.c
+LIBSRC:= init.c trace.c hoist.c debug.c sock.c
 ifeq ($(LIBNAME),)
   BINFLAGS:= -pie -Wl,-E $(LDFLAGS)
   BINSRC:= $(sort $(LIBSRC) $(BINSRC))

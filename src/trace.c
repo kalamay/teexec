@@ -10,6 +10,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/resource.h>
+#include <assert.h>
 
 /* TODO: this is horribly thread-unsafe at the moment */
 
@@ -17,11 +18,17 @@
 # define MSG_NOSIGNAL 0
 #endif
 
+#define MULTIBUF 64
+
+static int trace_mode = 0;
 static int trace_fd = -1;
 static int max_fd = 0;
 
-static int *table = NULL;
+struct entry { int fd; unsigned id; };
+static struct entry *table = NULL;
 static unsigned table_size = 0;
+static unsigned table_scan = 0;
+static unsigned table_id = 0;
 
 #define POLLFD_1 { -1, POLLOUT, 0 }
 #define POLLFD_2 POLLFD_1, POLLFD_1
@@ -32,23 +39,6 @@ static unsigned table_size = 0;
 #define POLLFD_64 POLLFD_32, POLLFD_32
 
 struct pollfd reuse[] = { POLLFD_64 };
-
-static void __attribute__((constructor))
-init(void)
-{
-	struct rlimit limit;
-	getrlimit(RLIMIT_NOFILE, &limit);
-	max_fd = limit.rlim_max > INT_MAX ? INT_MAX : (int)limit.rlim_max;
-
-	char *env = getenv("TEEXEC_FD");
-	if (env) {
-		char *end;
-		long val = strtol(env, &end, 10);
-		if (*end == '\0' && val >= 0 && val <= max_fd) {
-			trace_fd = (int)val;
-		}
-	}
-}
 
 static bool
 fd_trash(int tracefd)
@@ -65,10 +55,11 @@ fd_trash(int tracefd)
 static int
 fd_restore(void)
 {
+	/* Poll with immediate timeout to detect any closed trace sockets. */
 	int n = poll(reuse, countof(reuse), 0);
 	if (n > 0) {
 		for (size_t i = 0; i < countof(reuse); i++) {
-			if (reuse[i].revents & (POLLERR|POLLHUP)) {
+			if (reuse[i].revents & (POLLERR|POLLHUP|POLLNVAL)) {
 				DEBUG("pair closed: %d", reuse[i].fd);
 				xclose(reuse[i].fd);
 				reuse[i].fd = -1;
@@ -89,7 +80,16 @@ fd_get_pair(int clientfd)
 	if (clientfd < 0 || (unsigned)clientfd >= table_size) {
 		return -1;
 	}
-	return table[clientfd] - 1;
+	return table[clientfd].fd - 1;
+}
+
+static unsigned
+fd_get_id(int clientfd)
+{
+	if (clientfd < 0 || (unsigned)clientfd >= table_size) {
+		return -1;
+	}
+	return table[clientfd].id;
 }
 
 static void
@@ -112,13 +112,27 @@ fd_pair(int clientfd, int tracefd)
 		memset(table + table_size, 0, sizeof(*table) * (sz - table_size));
 		table_size = sz;
 	}
-	table[clientfd] = tracefd + 1;
+
+	table[clientfd].fd = tracefd + 1;
+	table[clientfd].id = ++table_id;
+}
+
+static int
+fd_multi(void)
+{
+	int fd = -1;
+	unsigned scan = table_scan, last = table_size-1, end = scan+last+1;
+	for (; scan < end && fd < 0; scan++) {
+		fd = fd_get_pair(scan & last);
+	}
+	table_scan = scan;
+	return fd;
 }
 
 static void
 fd_unpair(int clientfd, int tracefd, bool eof)
 {
-	table[clientfd] = 0;
+	table[clientfd].fd = 0;
 	if (!eof) {
 		eof = !fd_trash(tracefd);
 	}
@@ -128,10 +142,23 @@ fd_unpair(int clientfd, int tracefd, bool eof)
 }
 
 static void
-fd_trace(int clientfd, int tracefd, const struct iovec *iov, size_t iovcnt, ssize_t len)
+fd_trace(int clientfd, int tracefd, struct iovec *iov, size_t iovcnt, ssize_t len)
 {
 	if (len <= 0) {
 		return;
+	}
+
+	assert(iovcnt > 1);
+	assert(iov[0].iov_len == 0);
+
+	if (trace_mode & TRACE_MULTIPLEX) {
+		/* The first iovec is an empty buffer for adding the multiplexing data. */
+		unsigned id = fd_get_id(clientfd);
+		int n = snprintf(iov->iov_base, MULTIBUF, "@%u#%zd\r\n", id, len);
+		if (n > 0 && n <= MULTIBUF) {
+			iov->iov_len = n;
+			len += n;
+		}
 	}
 
 	struct msghdr msg = {
@@ -156,6 +183,20 @@ fd_trace(int clientfd, int tracefd, const struct iovec *iov, size_t iovcnt, ssiz
 }
 
 void
+trace_init(int fd, int mode)
+{
+	struct rlimit limit;
+	getrlimit(RLIMIT_NOFILE, &limit);
+
+	max_fd = limit.rlim_max > INT_MAX ? INT_MAX : (int)limit.rlim_max;
+
+	if (fd >= 0 && fd <= max_fd) {
+		trace_fd = fd;
+	}
+	trace_mode = mode;
+}
+
+void
 trace_start(int clientfd, int serverfd)
 {
 	if (clientfd < 0 || clientfd > max_fd) { return; }
@@ -165,6 +206,9 @@ trace_start(int clientfd, int serverfd)
 	int tracefd = fd_restore();
 	if (tracefd < 0) {
 		tracefd = xaccept(trace_fd, true);
+		if (tracefd < 0 && trace_mode & TRACE_MULTIPLEX) {
+			tracefd = fd_multi();
+		}
 	}
 	if (tracefd >= 0) {
 		DEBUG("pair: %d->%d", clientfd, tracefd);
@@ -186,8 +230,13 @@ trace(int clientfd, const char *buf, ssize_t len)
 {
 	int tracefd = fd_get_pair(clientfd);
 	if (tracefd > -1) {
-		struct iovec iov = { .iov_base = (char *)buf, .iov_len = len };
-		fd_trace(clientfd, tracefd, &iov, 1, len);
+		/* Set up an extra buffer for possible multiplexing. */
+		char multi[MULTIBUF];
+		struct iovec iov[2] = {
+			{ .iov_base = multi, .iov_len = 0 },
+			{ .iov_base = (char *)buf, .iov_len = len }
+		};
+		fd_trace(clientfd, tracefd, iov, countof(iov), len);
 	}
 }
 
@@ -196,11 +245,20 @@ tracev(int clientfd, const struct iovec *iov, size_t iovcnt)
 {
 	int tracefd = fd_get_pair(clientfd);
 	if (tracefd > -1) {
+		/* Set up an extra buffer for possible multiplexing. */
+		char multi[MULTIBUF];
+		struct iovec copy[iovcnt+1];
+		copy[0].iov_base = multi;
+		copy[0].iov_len = 0;
+
 		ssize_t len = 0;
+
 		for (size_t i = 0; i < iovcnt; i++) {
 			len += iov[i].iov_len;
+			copy[i+1] = iov[i];
 		}
-		fd_trace(clientfd, tracefd, iov, iovcnt, len);
+
+		fd_trace(clientfd, tracefd, copy, iovcnt+1, len);
 	}
 }
 

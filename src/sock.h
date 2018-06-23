@@ -94,6 +94,9 @@ sock_cloexec(int fd, bool on);
 const char *
 addr_encode(const struct sockaddr *addr);
 
+bool
+addr_equal(const struct sockaddr *a, const struct sockaddr *b);
+
 
 #define SOCKOPT(_type, _passive) ((struct sockopt) { \
 	.sndbuf = 0, \

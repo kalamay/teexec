@@ -12,6 +12,7 @@
 #include "proc.h"
 #include "sock.h"
 #include "debug.h"
+#include "trace.h"
 
 #if __APPLE__
 #define ENV_PRELOAD "DYLD_INSERT_LIBRARIES="
@@ -21,14 +22,14 @@
 #define ENV_PRELOAD "LD_PRELOAD="
 #define ENV_DEBUG_LIBS "LD_DEBUG=libs:statistics"
 #endif
-#define ENV_FD "TEEXEC_FD="
-#define ENV_DEBUG "TEEXEC_DEBUG=1"
+#define ENV_INIT "TEEXEC_INIT="
 
 #define TRACE_DEFAULT "/tmp/teexec.sock"
 
 static const struct opt opts[] = {
 	{ 'v', "verbose",      NULL,   "verbose output (repeat for furthur diagnostics)" },
 	{ 't', "trace",        "sock", "trace socket (default \"" TRACE_DEFAULT "\")" },
+	{ 'm', "multiplex",    NULL,   "bundle primary connections into a single channel" },
 	{ 'E', "preserve-env", NULL,   "preserve environment variables" },
 	{ 0,   NULL,           NULL,   NULL },
 };
@@ -46,13 +47,15 @@ main(int argc, char **argv, char **envp)
 {
 	const char *trace = TRACE_DEFAULT;
 	int verbose = 0;
+	int mode = 0;
 	bool preserve = false;
 	int ch;
 	while ((ch = cmd_getopt(argc, argv, &cmd)) != -1) {
 		switch (ch) {
-		case 'v': verbose++; break;
-		case 'E': preserve = true; break;
+		case 'v': verbose++; mode |= TRACE_DEBUG; break;
 		case 't': trace = optarg; break;
+		case 'm': mode |= TRACE_MULTIPLEX; break;
+		case 'E': preserve = true; break;
 		}
 	}
 	argc -= optind;
@@ -86,15 +89,15 @@ main(int argc, char **argv, char **envp)
 	strcat(env_lib, "/lib/" LIBNAME);
 #endif
 
-	char env_fd[64];
-	snprintf(env_fd, sizeof(env_fd), ENV_FD "%d", sock.fd);
+	char env_init[256];
+	snprintf(env_init, sizeof(env_init), ENV_INIT "%d:%d", sock.fd, mode);
 
 	int envc = 0;
 	if (preserve) {
 		for (char *const *e = envp; *e; e++, envc++) {}
 	}
 
-	char *env[envc+6];
+	char *env[envc+5];
 	if (preserve) {
 		for (int i = 0; i < envc; i++) { env[i] = envp[i]; }
 	}
@@ -107,10 +110,7 @@ main(int argc, char **argv, char **envp)
 		env[envc++] = ENV_DEBUG_STATS;
 #	endif
 	}
-	env[envc++] = env_fd;
-	if (verbose > 1) {
-		env[envc++] = ENV_DEBUG;
-	}
+	env[envc++] = env_init;
 	env[envc] = NULL;
 
 	char *name = strrchr(argv[0], '/');

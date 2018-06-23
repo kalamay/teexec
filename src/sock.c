@@ -404,3 +404,36 @@ addr_encode(const struct sockaddr *addr)
 	return rc;
 }
 
+bool
+addr_equal(const struct sockaddr *a, const struct sockaddr *b)
+{
+	if (a->sa_family != b->sa_family) { return false; }
+
+	if (a->sa_family == AF_UNIX) {
+		return 0 == strcmp(
+				((const struct sockaddr_un *)a)->sun_path,
+				((const struct sockaddr_un *)b)->sun_path);
+	}
+	else if (a->sa_family == AF_INET) {
+		const struct sockaddr_in *ain = (const struct sockaddr_in *)a;
+		const struct sockaddr_in *bin = (const struct sockaddr_in *)b;
+		return
+			ain->sin_addr.s_addr == bin->sin_addr.s_addr &&
+			ain->sin_port == bin->sin_port;
+	}
+	else if (a->sa_family == AF_INET6) {
+		const struct sockaddr_in6 *ain = (const struct sockaddr_in6 *)a;
+		const struct sockaddr_in6 *bin = (const struct sockaddr_in6 *)b;
+		return 
+			0 == memcmp(
+					ain->sin6_addr.s6_addr,
+					bin->sin6_addr.s6_addr,
+					sizeof(ain->sin6_addr.s6_addr)) &&
+			ain->sin6_port == bin->sin6_port &&
+			ain->sin6_flowinfo == bin->sin6_flowinfo &&
+			ain->sin6_scope_id == bin->sin6_scope_id;
+	}
+
+	return false;
+}
+
