@@ -46,9 +46,9 @@
 static const char *
 str(const char *in, size_t len)
 {
-	_Thread_local static char buf[40];
+	_Thread_local static char buf[44];
 
-	char *p = buf, *pe = p + sizeof(buf) - sizeof("\"\"...");
+	char *p = buf, *pe = p + sizeof(buf) - sizeof("\\xff\"\"...");
 	*p++ = '"';
 
 	size_t i;
