@@ -14,9 +14,7 @@ debug_enable(void);
 void
 debug_more_enable(void);
 
-#define DEBUG_CHECK(f) \
-	(__builtin_expect(atomic_load_explicit(&(f), memory_order_relaxed), 0))
-
+#define DEBUG_CHECK(f) unlikely(atomic_load_explicit(&(f), memory_order_relaxed))
 #define DEBUG_ENABLED DEBUG_CHECK(debug_enabled)
 #define DEBUG_MORE_ENABLED DEBUG_CHECK(debug_more_enabled)
 

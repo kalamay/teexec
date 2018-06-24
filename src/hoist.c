@@ -2,6 +2,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <sys/uio.h>
+#include <sys/syscall.h>
+#include <stdarg.h>
 #include <errno.h>
 
 #include "debug.h"
@@ -131,6 +133,33 @@ hoist(accept4, int,
 			sockfd, addr_encode(addr), flags, rcmsg(n));
 	if (n > -1) {
 		trace_start(n, sockfd);
+	}
+	return n;
+}
+
+/* TODO: This could safely use explicit args, but it conflicts with a prior
+ * definition of the function. If we can keep syscall from being included,
+ * this could clean up quite a bit. */
+hoist(syscall, long,
+		long number, ...)
+{
+	va_list ap;
+	va_start(ap, number);
+	long a1 = va_arg(ap, long);
+	long a2 = va_arg(ap, long);
+	long a3 = va_arg(ap, long);
+	long a4 = va_arg(ap, long);
+	long a5 = va_arg(ap, long);
+	long a6 = va_arg(ap, long);
+	va_end(ap);
+
+	long n = libc(syscall)(number, a1, a2, a3, a4, a5, a6);
+	if (unlikely(number == SYS_accept4)) {
+		DEBUG("accept4(%ld, \"%s\", %ld) = %s",
+				a1, addr_encode((struct sockaddr *)a2), a4, rcmsg(n));
+		if (n > -1) {
+			trace_start(n, a1);
+		}
 	}
 	return n;
 }

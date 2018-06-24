@@ -7,6 +7,7 @@ GLIBC_2.2.5 {
 		recv;
 		recvfrom;
 		recvmsg;
+		syscall;
 	local: *;
 };
 

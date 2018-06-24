@@ -9,6 +9,9 @@
 #define export __attribute__((visibility("default")))
 #define constructor(name) __attribute__((constructor)) static void name(void)
 
+#define likely(x)   __builtin_expect((x),1)
+#define unlikely(x) __builtin_expect((x),0)
+
 #define countof(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 #ifdef TEMP_FAILURE_RETRY
