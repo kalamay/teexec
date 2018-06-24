@@ -93,7 +93,7 @@ $(DESTLIB): $(LIB)
 	install -m 755 $< $(LIBDIR)/
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/lib/$(LIBNAME) $(DESTDIR)$(PREFIX)/bin/$(NAME)
+	rm -f $(DESTLIB) $(DESTBIN)
 
 clean:
 	rm -rf build/tmp build/bin build/lib
