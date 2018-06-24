@@ -375,7 +375,7 @@ addr_encode(const struct sockaddr *addr)
 
 	default:
 		*buf = '\0';
-		return NULL;
+		return buf;
 
 	case AF_UNIX:
 		return strncpy(buf, ((const struct sockaddr_un *)addr)->sun_path, sizeof(buf));
@@ -397,7 +397,7 @@ addr_encode(const struct sockaddr *addr)
 		ssize_t slen = strlen(buf), rem = (ssize_t)sizeof(buf) - slen, end;
 		end = snprintf(buf+slen, rem, ":%d", ntohs(port));
 		if (end < 0 || end > rem) {
-			rc = NULL;
+			buf[slen] = '\0';
 		}
 	}
 
