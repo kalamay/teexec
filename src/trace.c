@@ -144,11 +144,7 @@ fd_unpair(int clientfd, int tracefd, bool eof)
 static void
 fd_trace(int clientfd, int tracefd, struct iovec *iov, size_t iovcnt, ssize_t len)
 {
-	if (len <= 0) {
-		return;
-	}
-
-	assert(iovcnt > 1);
+	assert(iovcnt > 0);
 	assert(iov[0].iov_len == 0);
 
 	if (trace_mode & TRACE_MULTIPLEX) {
@@ -221,6 +217,11 @@ trace_stop(int clientfd)
 {
 	int tracefd = fd_get_pair(clientfd);
 	if (tracefd >= 0) {
+		if (trace_mode & TRACE_MULTIPLEX) {
+			char multi[MULTIBUF];
+			struct iovec iov = { .iov_base = multi, .iov_len = 0 };
+			fd_trace(clientfd, tracefd, &iov, 1, 0);
+		}
 		fd_unpair(clientfd, tracefd, false);
 	}
 }
@@ -228,6 +229,8 @@ trace_stop(int clientfd)
 void
 trace(int clientfd, const char *buf, ssize_t len)
 {
+	if (len == 0) { return; }
+
 	int tracefd = fd_get_pair(clientfd);
 	if (tracefd > -1) {
 		/* Set up an extra buffer for possible multiplexing. */
@@ -258,7 +261,9 @@ tracev(int clientfd, const struct iovec *iov, size_t iovcnt)
 			copy[i+1] = iov[i];
 		}
 
-		fd_trace(clientfd, tracefd, copy, iovcnt+1, len);
+		if (len > 0) {
+			fd_trace(clientfd, tracefd, copy, iovcnt+1, len);
+		}
 	}
 }
 
