@@ -371,7 +371,7 @@ addr_encode(const struct sockaddr *addr)
 	const char *rc;
 	in_port_t port;
 
-	switch(addr->sa_family) {
+	switch(addr ? addr->sa_family : INT_MAX) {
 
 	default:
 		*buf = '\0';
