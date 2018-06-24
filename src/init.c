@@ -24,6 +24,9 @@ constructor(init)
 	if (mode & TRACE_DEBUG) {
 		debug_enable();
 	}
+	if (mode & TRACE_DEBUG_MORE) {
+		debug_more_enable();
+	}
 
 	trace_init(fd, mode);
 }

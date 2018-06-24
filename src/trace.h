@@ -7,8 +7,9 @@
 
 #include "util.h"
 
-#define TRACE_DEBUG 1
-#define TRACE_MULTIPLEX 2
+#define TRACE_DEBUG      (1<<0)
+#define TRACE_DEBUG_MORE (1<<1)
+#define TRACE_MULTIPLEX  (1<<2)
 
 void
 trace_init(int fd, int mode);

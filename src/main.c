@@ -27,7 +27,7 @@
 #define TRACE_DEFAULT "/tmp/teexec.sock"
 
 static const struct opt opts[] = {
-	{ 'v', "verbose",      NULL,   "verbose output (repeat for furthur diagnostics)" },
+	{ 'v', "verbose",      NULL,   "verbose output (for furthur diagnostics repeat up to 4 )" },
 	{ 't', "trace",        "sock", "trace socket (default \"" TRACE_DEFAULT "\")" },
 	{ 'm', "multiplex",    NULL,   "bundle primary connections into a single channel" },
 	{ 'E', "preserve-env", NULL,   "preserve environment variables" },
@@ -52,7 +52,7 @@ main(int argc, char **argv, char **envp)
 	int ch;
 	while ((ch = cmd_getopt(argc, argv, &cmd)) != -1) {
 		switch (ch) {
-		case 'v': verbose++; mode |= TRACE_DEBUG; break;
+		case 'v': verbose++; break;
 		case 't': trace = optarg; break;
 		case 'm': mode |= TRACE_MULTIPLEX; break;
 		case 'E': preserve = true; break;
@@ -63,6 +63,13 @@ main(int argc, char **argv, char **envp)
 
 	if (argc == 0) {
 		errx(1, "command not set");
+	}
+
+	if (verbose > 1) {
+		mode |= TRACE_DEBUG;
+		if (verbose > 2) {
+			mode |= TRACE_DEBUG_MORE;
+		}
 	}
 
 	char exe[4096];
@@ -102,7 +109,7 @@ main(int argc, char **argv, char **envp)
 		for (int i = 0; i < envc; i++) { env[i] = envp[i]; }
 	}
 	env[envc++] = env_lib;
-	if (verbose > 2) {
+	if (verbose > 3) {
 #	ifdef ENV_DEBUG_LIBS
 		env[envc++] = ENV_DEBUG_LIBS;
 #	endif

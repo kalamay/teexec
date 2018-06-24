@@ -169,7 +169,7 @@ fd_trace(int clientfd, int tracefd, struct iovec *iov, size_t iovcnt, ssize_t le
 
 	ssize_t n = sendmsg(tracefd, &msg, MSG_NOSIGNAL|MSG_DONTWAIT);
 
-	DEBUG("pair copy: %zd/%zd", n, len);
+	DEBUG_MORE("pair copy: %zd/%zd", n, len);
 	if (n < len) {
 		if (n < 0)       { DEBUG("pair failed: %d, %s", tracefd, strerror(errno)); }
 		else if (n == 0) { DEBUG("pair closed: %d", tracefd); }
@@ -209,6 +209,9 @@ trace_start(int clientfd, int serverfd)
 	if (tracefd >= 0) {
 		DEBUG("pair: %d->%d", clientfd, tracefd);
 		fd_pair(clientfd, tracefd);
+	}
+	else {
+		DEBUG("no pair: %d", clientfd);
 	}
 }
 

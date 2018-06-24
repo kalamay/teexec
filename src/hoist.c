@@ -140,7 +140,7 @@ hoist(read, ssize_t,
 		int fd, void *buf, size_t count)
 {
 	ssize_t n = libc(read)(fd, buf, count);
-	DEBUG("read(%d, %s, %zu) = %s",
+	DEBUG_MORE("read(%d, %s, %zu) = %s",
 			fd, str(buf, (size_t)n), count, rcmsg(n));
 	if (n > 0) {
 		trace(fd, buf, n);
@@ -153,7 +153,7 @@ hoist(__read_chk, ssize_t,
 		int fd, void *buf, size_t nbytes, size_t buflen)
 {
 	ssize_t n = libc(__read_chk)(fd, buf, nbytes, buflen);
-	DEBUG("__read_chk(%d, %s, %zu, %zu) = %s",
+	DEBUG_MORE("__read_chk(%d, %s, %zu, %zu) = %s",
 			fd, str(buf, (size_t)n), nbytes, buflen, rcmsg(n));
 	if (n > 0) {
 		trace(fd, buf, n);
@@ -166,7 +166,7 @@ hoist(readv, ssize_t,
 		int fd, const struct iovec *iov, int iovcnt)
 {
 	ssize_t n = libc(readv)(fd, iov, iovcnt);
-	DEBUG("readv(%d, %p, %d) = %s",
+	DEBUG_MORE("readv(%d, %p, %d) = %s",
 			fd, iov, iovcnt, rcmsg(n));
 	if (n > 0) {
 		tracev(fd, iov, iovcnt);
@@ -179,7 +179,7 @@ hoist(recvfrom, ssize_t,
 		struct sockaddr *src_addr, socklen_t *addrlen)
 {
 	ssize_t n = libc(recvfrom)(sockfd, buf, len, flags, src_addr, addrlen);
-	DEBUG("recvfrom(%d, %s, %zu, %d, %p, %p) = %s",
+	DEBUG_MORE("recvfrom(%d, %s, %zu, %d, %p, %p) = %s",
 			sockfd, str(buf, (size_t)n), len, flags, src_addr, addrlen, rcmsg(n));
 	if (n > 0) {
 		trace(sockfd, buf, n);
@@ -191,7 +191,7 @@ hoist(recv, ssize_t,
 		int sockfd, void *buf, size_t len, int flags)
 {
 	ssize_t n = libc(recvfrom)(sockfd, buf, len, flags, NULL, NULL);
-	DEBUG("recv(%d, %s, %zu, %d) = %s",
+	DEBUG_MORE("recv(%d, %s, %zu, %d) = %s",
 			sockfd, str(buf, (size_t)n), len, flags, rcmsg(n));
 	if (n > 0) {
 		trace(sockfd, buf, n);
@@ -204,7 +204,7 @@ hoist(__recv_chk, ssize_t,
 		int sockfd, void *buf, size_t len, size_t buflen, int flags)
 {
 	ssize_t n = libc(__recv_chk)(sockfd, buf, len, buflen, flags);
-	DEBUG("__recv_chk(%d, %s, %zu, %zu, %d) = %s",
+	DEBUG_MORE("__recv_chk(%d, %s, %zu, %zu, %d) = %s",
 			sockfd, str(buf, (size_t)n), len, buflen, flags, rcmsg(n));
 	if (n > 0) {
 		trace(sockfd, buf, n);
@@ -219,7 +219,7 @@ hoist(__recvfrom_chk, ssize_t,
 		struct sockaddr *src_addr, socklen_t *addrlen)
 {
 	ssize_t n = libc(__recvfrom_chk)(sockfd, buf, len, buflen, flags, src_addr, addrlen);
-	DEBUG("__recvfrom_chk(%d, %s, %zu, %zu, %d, %p, %p) = %s",
+	DEBUG_MORE("__recvfrom_chk(%d, %s, %zu, %zu, %d, %p, %p) = %s",
 			sockfd, str(buf, (size_t)n), len, buflen, flags, src_addr, addrlen, rcmsg(n));
 	if (n > 0) {
 		trace(sockfd, buf, n);
@@ -232,7 +232,7 @@ hoist(recvmsg, ssize_t,
 		int sockfd, struct msghdr *msg, int flags)
 {
 	ssize_t n = libc(recvmsg)(sockfd, msg, flags);
-	DEBUG("recvmsg(%d, %p, %d) = %s",
+	DEBUG_MORE("recvmsg(%d, %p, %d) = %s",
 			sockfd, msg, flags, rcmsg(n));
 	if (n > 0) {
 		tracev(sockfd, msg->msg_iov, msg->msg_iovlen);
@@ -246,7 +246,7 @@ hoist(recvmmsg, int,
 		int flags, struct timespec *timeout)
 {
 	int n = libc(recvmmsg)(sockfd, msgvec, vlen, flags, timeout);
-	DEBUG("recvmmsg(%d, %p, %u, %d, %p) = %s",
+	DEBUG_MORE("recvmmsg(%d, %p, %u, %d, %p) = %s",
 			sockfd, msgvec, vlen, flags, timeout, rcmsg(n));
 	if (n > 0) {
 		size_t iovcnt = 0;
