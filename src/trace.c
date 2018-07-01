@@ -6,10 +6,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <poll.h>
-#include <limits.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/resource.h>
 #include <assert.h>
 
 /* TODO: this is horribly thread-unsafe at the moment */
@@ -179,14 +177,10 @@ fd_trace(int clientfd, int tracefd, struct iovec *iov, size_t iovcnt, ssize_t le
 }
 
 void
-trace_init(int fd, int mode)
+trace_init(int max, int fd, int mode)
 {
-	struct rlimit limit;
-	getrlimit(RLIMIT_NOFILE, &limit);
-
-	max_fd = limit.rlim_max > INT_MAX ? INT_MAX : (int)limit.rlim_max;
-
-	if (fd >= 0 && fd <= max_fd) {
+	max_fd = max;
+	if (fd >= 0 && fd <= max) {
 		trace_fd = fd;
 	}
 	trace_mode = mode;
