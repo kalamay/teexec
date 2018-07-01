@@ -1,9 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include <sys/uio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 
 #include "util.h"
 #include "advice.h"
@@ -44,7 +41,7 @@ struct init {
 #define hoist(name, ret, ...) \
 	static ret (*libc_##name)(__VA_ARGS__); \
 	static void hoist_##name(void) { libc_##name = dlsym(RTLD_NEXT, #name); } \
-	__attribute__((used, section("hoist_array"))) \
+	__attribute__((used, section("teexec_hoist_init"))) \
 	static struct init fp_##name = { hoist_##name }; \
 	export ret name(__VA_ARGS__)
 
@@ -53,9 +50,9 @@ struct init {
 void
 hoist_init(void)
 {
-	extern struct init __start_hoist_array;
-	extern struct init __stop_hoist_array;
-	for (struct init *i = &__start_hoist_array; i != &__stop_hoist_array; i++) {
+	extern struct init __start_teexec_hoist_init;
+	extern struct init __stop_teexec_hoist_init;
+	for (struct init *i = &__start_teexec_hoist_init; i != &__stop_teexec_hoist_init; i++) {
 		i->init();
 	}
 }

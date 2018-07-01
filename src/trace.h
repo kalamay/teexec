@@ -10,6 +10,8 @@
 #define TRACE_DEBUG      (1<<0)
 #define TRACE_DEBUG_MORE (1<<1)
 #define TRACE_MULTIPLEX  (1<<2)
+#define TRACE_LIBC       (1<<3)
+#define TRACE_PTRACE     (1<<4)
 
 void
 trace_init(int max_fd, int fd, int mode);

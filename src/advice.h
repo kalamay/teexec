@@ -1,6 +1,10 @@
 #ifndef TEEXEC_ADVICE_H
 #define TEEXEC_ADVICE_H
 
+#include <sys/uio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+
 void before_close(int fd);
 void after_close(int rc, int fd);
 

@@ -46,8 +46,9 @@ else
   SOFLAGS:= -shared -nostdlib
 endif
 
-BINSRC:= main.c cmd.c proc.c sock.c debug.c
-LIBSRC:= init.c advice.c trace.c hoist.c debug.c sock.c
+ALLSRC:= sock.c debug.c advice.c trace.c
+BINSRC:= main.c cmd.c proc.c kern.c $(ALLSRC)
+LIBSRC:= init.c hoist.c $(ALLSRC)
 ifeq ($(LIBNAME),)
   BINFLAGS:= -pie -Wl,-E $(LDFLAGS)
   BINSRC:= $(sort $(LIBSRC) $(BINSRC))

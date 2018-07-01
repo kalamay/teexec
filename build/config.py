@@ -80,4 +80,5 @@ if has_read_chk():     print_flag("READ_CHK")
 if has_recv_chk():     print_flag("RECV_CHK")
 if has_recvfrom_chk(): print_flag("RECVFROM_CHK")
 check_define("SYS_ACCEPT4", "sys/syscall.h", "SYS_accept4")
+check_define("PTRACE", "sys/ptrace.h", "PTRACE_GETREGSET")
 

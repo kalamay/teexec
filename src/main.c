@@ -13,6 +13,7 @@
 #include "sock.h"
 #include "debug.h"
 #include "trace.h"
+#include "kern.h"
 
 #if __APPLE__
 #define ENV_PRELOAD "DYLD_INSERT_LIBRARIES="
@@ -30,6 +31,8 @@ static const struct opt opts[] = {
 	{ 'v', "verbose",      NULL,   "verbose output (for furthur diagnostics repeat up to 4 )" },
 	{ 't', "trace",        "sock", "trace socket (default \"" TRACE_DEFAULT "\")" },
 	{ 'm', "multiplex",    NULL,   "bundle primary connections into a single channel" },
+	{ 'l', "libc",         NULL,   "hoist libc calls for cloning traffic" },
+	{ 'p', "ptrace",       NULL,   "use ptrace for cloning traffic" },
 	{ 'E', "preserve-env", NULL,   "preserve environment variables" },
 	{ 0,   NULL,           NULL,   NULL },
 };
@@ -57,6 +60,8 @@ main(int argc, char **argv, char **envp)
 		case 'v': verbose++; break;
 		case 't': trace = optarg; break;
 		case 'm': mode |= TRACE_MULTIPLEX; break;
+		case 'l': mode |= TRACE_LIBC; break;
+		case 'p': mode |= TRACE_PTRACE; break;
 		case 'E': preserve = true; break;
 		}
 	}
@@ -65,6 +70,10 @@ main(int argc, char **argv, char **envp)
 
 	if (argc == 0) {
 		errx(1, "command not set");
+	}
+
+	if (!(mode & (TRACE_LIBC|TRACE_PTRACE))) {
+		mode |= TRACE_LIBC;
 	}
 
 	if (verbose > 1) {
@@ -89,37 +98,40 @@ main(int argc, char **argv, char **envp)
 		exit(1);
 	}
 
-	char env_lib[4096+sizeof(ENV_PRELOAD)];
-	memcpy(env_lib, ENV_PRELOAD, sizeof(ENV_PRELOAD));
-	strcat(env_lib, proc_path());
-#ifdef LIBNAME
-	strrchr(env_lib, '/')[0] = '\0';
-	strrchr(env_lib, '/')[0] = '\0';
-	strcat(env_lib, "/lib/" LIBNAME);
-#endif
-
-	char env_init[256];
-	snprintf(env_init, sizeof(env_init), ENV_INIT "%d:%d", sock.fd, mode);
-
 	int envc = 0;
 	if (preserve) {
 		for (char *const *e = envp; *e; e++, envc++) {}
 	}
 
+	char env_lib[4096+sizeof(ENV_PRELOAD)];
+	char env_init[256];
 	char *env[envc+5];
+
 	if (preserve) {
 		for (int i = 0; i < envc; i++) { env[i] = envp[i]; }
 	}
-	env[envc++] = env_lib;
-	if (verbose > 3) {
+
+	if (mode & TRACE_LIBC) {
+		memcpy(env_lib, ENV_PRELOAD, sizeof(ENV_PRELOAD));
+		strcat(env_lib, proc_path());
+#ifdef LIBNAME
+		strrchr(env_lib, '/')[0] = '\0';
+		strrchr(env_lib, '/')[0] = '\0';
+		strcat(env_lib, "/lib/" LIBNAME);
+#endif
+
+		snprintf(env_init, sizeof(env_init), ENV_INIT "%d:%d", sock.fd, mode);
+		env[envc++] = env_lib;
+		if (verbose > 3) {
 #	ifdef ENV_DEBUG_LIBS
-		env[envc++] = ENV_DEBUG_LIBS;
+			env[envc++] = ENV_DEBUG_LIBS;
 #	endif
 #	ifdef ENV_DEBUG_STATS
-		env[envc++] = ENV_DEBUG_STATS;
+			env[envc++] = ENV_DEBUG_STATS;
 #	endif
+		}
+		env[envc++] = env_init;
 	}
-	env[envc++] = env_init;
 	env[envc] = NULL;
 
 	char *name = strrchr(argv[0], '/');
@@ -144,7 +156,12 @@ main(int argc, char **argv, char **envp)
 		}
 	}
 
-	execve(exe, argv, env);
-	err(1, "failed to exec");
+	if (mode & TRACE_LIBC) {
+		execve(exe, argv, env);
+		err(1, "failed to exec");
+	}
+	else {
+		kern_run(exe, argv, env);
+	}
 }
 

@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdatomic.h>
 
+#include "util.h"
+
 atomic_bool debug_enabled;
 atomic_bool debug_more_enabled;
 
