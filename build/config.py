@@ -1,20 +1,33 @@
 #!/usr/bin/env python
 
 import os
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, check_output
+from tempfile import NamedTemporaryFile
 
-CC = ['cc', '-D_GNU_SOURCE', '-O', '-Werror', '-Wno-unused-result', '-ldl', '-x', 'c', '-o', '/dev/null', '-']
+CC = ['cc', '-D_GNU_SOURCE', '-O', '-Werror', '-Wno-unused-result',
+		'-ldl', '-x', 'c', '-', '-o', '/dev/stdout']
 DEVNULL = open(os.devnull, 'w')
 
-def print_flag(name):
+def print_flag(name, val="1"):
 	print("""#ifndef HAS_%s
-#	define HAS_%s 1
-#endif""" % (name, name))
+# define HAS_%s %s
+#endif""" % (name, name, val))
 
 def compiles(c):
 	p = Popen(CC, stdin=PIPE, stdout=DEVNULL, stderr=DEVNULL)
 	p.communicate(input=c)
 	return p.returncode == 0
+
+def capture(c):
+	with NamedTemporaryFile(mode='w+b') as f:
+		p = Popen(CC, stdin=PIPE, stdout=f, stderr=DEVNULL)
+		p.communicate(input=c)
+		if p.returncode == 0:
+			f.file.close()
+			os.chmod(f.name, 0700)
+			return check_output([f.name, f.name])
+		else:
+			return None
 
 def has_function(name, args, hdr):
 	return compiles("""
@@ -27,6 +40,15 @@ def has_sock_flags():
 		#include <sys/socket.h>
 		int main(void) { socket(AF_INET, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0); }
 	""")
+
+def check_define(name, hdr, define):
+	val = capture("""
+		#include <stdio.h>
+		#include <%s>
+		int main(void) { printf("%%d", %s); }
+	""" % (hdr, define))
+	if val:
+		print_flag(name, val)
 
 def has_accept4():
 	return has_function("accept4", 4, "sys/socket.h")
@@ -57,4 +79,5 @@ if has_recvmmsg():     print_flag("RECVMMSG")
 if has_read_chk():     print_flag("READ_CHK")
 if has_recv_chk():     print_flag("RECV_CHK")
 if has_recvfrom_chk(): print_flag("RECVFROM_CHK")
+check_define("SYS_ACCEPT4", "sys/syscall.h", "SYS_accept4")
 

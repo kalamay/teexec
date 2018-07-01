@@ -12,7 +12,7 @@
 #define TRACE_MULTIPLEX  (1<<2)
 
 void
-trace_init(int fd, int mode);
+trace_init(int max_fd, int fd, int mode);
 
 void
 trace_start(int clientfd, int serverfd);

@@ -22,7 +22,7 @@ CFLAGS:= -std=gnu11 -MMD -fPIC -fvisibility=hidden $(ARCHFLAGS)
 ifeq ($(BUILD),debug)
   CFLAGS+= -Wall -Wextra -Werror -g
 else
-  OPTFLAGS:= -O2
+  OPTFLAGS:= -O3
   ifeq ($(findstring BSD,$(OS)),)
     OPTFLAGS+= -flto
   endif
@@ -47,7 +47,7 @@ else
 endif
 
 BINSRC:= main.c cmd.c proc.c sock.c debug.c
-LIBSRC:= init.c trace.c hoist.c debug.c sock.c
+LIBSRC:= init.c advice.c trace.c hoist.c debug.c sock.c
 ifeq ($(LIBNAME),)
   BINFLAGS:= -pie -Wl,-E $(LDFLAGS)
   BINSRC:= $(sort $(LIBSRC) $(BINSRC))

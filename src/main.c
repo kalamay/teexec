@@ -45,6 +45,8 @@ static const struct cmd cmd = {
 int
 main(int argc, char **argv, char **envp)
 {
+	unsetenv("TEEXEC_INIT");
+
 	const char *trace = TRACE_DEFAULT;
 	int verbose = 0;
 	int mode = 0;
